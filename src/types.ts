@@ -1,3 +1,11 @@
+/**
+ * 职责：与后端 DTO/VO 一一对应的前端类型定义，供 api 层与页面共享。
+ * 依赖：无，纯类型文件，编译后不产生运行时代码。
+ * 坑：
+ * 1. 后端雪花 ID 经序列化后是 string，前端 id 一律用 string，别写 number；
+ * 2. 大量字段是可空可选的，渲染前要判空，否则会出现 "null" 字样；
+ * 3. 分页固定是 items/total/page/pageSize，不是常见的 records 或 list。
+ */
 export interface AuthUser {
   userId: string
   username: string
@@ -16,6 +24,7 @@ export interface LoginResult {
   userInfo: AuthUser
 }
 
+// 统一分页结构，所有列表接口都复用它
 export interface PageResult<T> {
   items: T[]
   total: number
@@ -23,6 +32,7 @@ export interface PageResult<T> {
   pageSize: number
 }
 
+// status 是数字枚举，展示文案与颜色统一查 utils 里的 DOC_STATUS
 export interface DocumentItem {
   id: string
   title: string
@@ -115,6 +125,7 @@ export interface GraphHit {
   snippet?: string | null
 }
 
+// GraphView* 是 /graph/overview 的画图结构（kind 决定样式），GraphNode/GraphEdge 是 /graph/nodes、/graph/edges 的原始结构
 export interface GraphViewNode {
   id: string
   name: string

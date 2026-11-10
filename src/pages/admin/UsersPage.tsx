@@ -1,3 +1,10 @@
+/**
+ * 用户管理：表格 + 分页 + 三个弹窗（新建用户、重置密码、分配角色）。
+ * 关键交互：搜索、翻页、写操作后刷新都统一走 load(page)，角色下拉数据来自 roleApi.list；
+ * 重置密码与分配角色都是独立弹窗，成功后各自关闭并刷新当前页。
+ * 坑 1：本页要求 ADMIN，接口层还会再校验一次，前端藏入口不等于安全；
+ * 坑 2：分配角色不允许为空，这里先拦一道给出中文提示，避免直接吃后端的英文报错。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd'
 import { roleApi, userApi } from '../../api'
@@ -19,6 +26,7 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = useState('')
   const [form] = Form.useForm()
 
+  // 查询、翻页、写后刷新都走这里，保证 page 状态和接口参数一致
   async function load(nextPage = page) {
     setLoading(true)
     try {
@@ -37,6 +45,7 @@ export default function UsersPage() {
     }
   }
 
+  // 首屏拉第一页 + 角色字典；角色列表失败只是下拉为空，不阻断表格
   useEffect(() => {
     void load(1)
     roleApi.list().then(setRoles).catch(() => undefined)
@@ -107,6 +116,7 @@ export default function UsersPage() {
           },
         ]}
       />
+      {/* 三个弹窗各自独立 state：新建用户、重置密码、分配角色互不干扰 */}
       <Modal
         title="新建用户"
         open={createOpen}

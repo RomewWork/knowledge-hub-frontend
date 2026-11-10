@@ -1,3 +1,10 @@
+/**
+ * 工作台总览页：展示当前用户的文档统计、功能入口和最近文档。
+ * 关键交互：useEffect 同时拉取 userApi.stats() 与最近 8 条文档，入口卡片先用 can() 判断权限再渲染，
+ * 点击文档标题跳转详情。
+ * 坑 1：统计和列表请求都用 catch(() => undefined) 吞掉异常，接口失败时页面只显示 0 或空表，不会提示。
+ * 坑 2：这里用 can() 隐藏入口只是体验优化，越权访问的兜底在后端 @RequirePermission，不能当安全边界。
+ */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -19,6 +26,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<UserStats | null>(null)
   const [docs, setDocs] = useState<DocumentItem[]>([])
 
+  // 进入页面时加载统计数据与最近文档；没有 document:list 权限就不请求列表
   useEffect(() => {
     userApi.stats().then(setStats).catch(() => undefined)
     if (can(user, 'document:list')) {
@@ -107,6 +115,7 @@ export default function DashboardPage() {
               dataIndex: 'status',
               width: 100,
               render: (status: number) => (
+                // 状态码 0 草稿 / 1 已发布 / 2 已归档 / 3 待审核，统一由 DOC_STATUS 映射成标签
                 <Tag color={DOC_STATUS[status]?.color}>{DOC_STATUS[status]?.label ?? status}</Tag>
               ),
             },

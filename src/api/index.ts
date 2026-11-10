@@ -1,3 +1,11 @@
+/**
+ * 职责：按业务域聚合 9 组 API（auth/document/search/ai/graph/user/role/permission/team），页面只依赖这里而不直接 fetch。
+ * 依赖：./client 的 get/post/put/patch/del/request，../types 的 DTO/VO 类型。
+ * 坑：
+ * 1. 列表查询统一用 URLSearchParams 过滤 undefined 与空串，否则后端会把 "page=" 当成非法入参；
+ * 2. uploadParse 必须直接走 request 传 FormData，若用 post 会被 JSON.stringify 成 "{}"；
+ * 3. aiApi.chat 会生成答案并写入会话，ragSearch 只返回召回的切片，二者成本和用途不同，别互相替代。
+ */
 import { del, get, patch, post, put, request } from './client'
 import type {
   ChatMessage,
@@ -44,6 +52,7 @@ export const documentApi = {
   publish: (id: string) => put<DocumentItem>(`/documents/${id}/publish`),
   archive: (id: string) => put<DocumentItem>(`/documents/${id}/archive`),
   saveDraft: (id: string) => put<DocumentItem>(`/documents/${id}/save-draft`),
+  // 表单上传不能走 post（body 会被 JSON 序列化），交给 request 识别 FormData
   uploadParse: (form: FormData) =>
     request<{ documentId: string; title: string; status: number }>('/documents/upload/parse', {
       method: 'POST',
@@ -75,6 +84,7 @@ export const searchApi = {
 }
 
 export const aiApi = {
+  // chat 走 RAG 生成答案并返回 sources；ragSearch 只做检索，给需要自行组装上下文的地方用
   chat: (content: string, topK = 5, sessionId?: string) =>
     post<ChatResult>('/ai/chat', { content, topK, sessionId }),
   ragSearch: (query: string, topK = 8) => post<ChunkHit[]>('/rag/search', { query, topK }),

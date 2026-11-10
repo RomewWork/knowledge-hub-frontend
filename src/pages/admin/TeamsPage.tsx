@@ -1,3 +1,10 @@
+/**
+ * 团队管理：团队表格 + 分页 + 新建团队 + 成员弹窗。
+ * 关键交互：成员弹窗里用逗号分隔的用户 ID 批量添加，加完重新拉一次成员列表；
+ * 关键词查询与翻页都由 load(page) 统一处理。
+ * 坑 1：成员行结构是 { userId, username, ... }，表格 rowKey 必须用 userId 而不是 id；
+ * 坑 2：本页要求 ADMIN，接口层还会再校验一次。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Space, Table, message } from 'antd'
 import { teamApi } from '../../api'
@@ -22,6 +29,7 @@ export default function TeamsPage() {
   const [memberIds, setMemberIds] = useState('')
   const [form] = Form.useForm()
 
+  // 查询、翻页、新建后刷新都走这里，保证 page 与接口参数一致
   async function load(nextPage = page) {
     try {
       const res = await teamApi.page({
@@ -37,6 +45,7 @@ export default function TeamsPage() {
     }
   }
 
+  // 首屏只拉第一页，关键词为空即全量第一页
   useEffect(() => {
     void load(1)
   }, [])
@@ -128,6 +137,7 @@ export default function TeamsPage() {
             type="primary"
             onClick={async () => {
               if (!membersFor) return
+              // 逗号串先 trim 再过滤空串，避免用户多敲空格提交出空 id
               const ids = memberIds.split(',').map((s) => s.trim()).filter(Boolean)
               if (!ids.length) return
               try {

@@ -1,3 +1,11 @@
+/**
+ * 职责：登录后的整体框架，顶栏一级导航、侧栏二级导航、用户菜单与退出，内容区由 Outlet 承载子路由。
+ * 依赖：../api 的 authApi、../auth 的 useAuth/updateUser/clearAuth、../utils 的 can/displayName/isAdmin/isReviewer。
+ * 坑：
+ * 1. 顶栏和侧栏都是按 can()/isAdmin()/isReviewer() 现场拼的，用户权限变化后要等 /me 回来才会重算；
+ * 2. topKey 是对 pathname 的归一化映射（/admin/reviews 归到文档域），不要直接拿 pathname 去匹配一级菜单；
+ * 3. 挂载时的 /me 只用于刷新用户信息，失败必须静默，不能因为网络抖动把用户踢下线。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -36,10 +44,12 @@ export default function AppLayout() {
     token: { colorBgContainer },
   } = theme.useToken()
 
+  // 用最新的 /me 结果覆盖本地缓存的 roles/permissions，防止后台改权限后前端一直用旧值
   useEffect(() => {
     authApi.me().then(updateUser).catch(() => undefined)
   }, [])
 
+  // 把具体路径收敛成一级菜单的 key，顶栏高亮与侧栏内容都依赖它
   const topKey = useMemo(() => {
     if (location.pathname.startsWith('/documents') || location.pathname.startsWith('/admin/reviews')) {
       return '/documents'
@@ -73,6 +83,7 @@ export default function AppLayout() {
     return items
   }, [user])
 
+  // 侧栏只展示当前一级域下的二级入口，故按 topKey 分支返回标题与 items
   const side = useMemo(() => {
     if (topKey === '/documents') {
       const items: MenuItem[] = [
@@ -133,6 +144,7 @@ export default function AppLayout() {
           <BrandLogo />
           <span className="kh-logo-text">Knowledge Hub</span>
         </div>
+        {/* 一级菜单里“系统管理”的 key 是 /admin/users，而 topKey 被归一成 /admin，这里换回菜单项 key */}
         <Menu
           className="kh-top-menu"
           mode="horizontal"
@@ -163,6 +175,7 @@ export default function AppLayout() {
               onClick: ({ key }) => {
                 if (key === 'profile') navigate('/profile')
                 if (key === 'logout') {
+                  // 不等接口返回就先清本地登录态，避免弱网下退出看起来"没反应"
                   authApi.logout().catch(() => undefined)
                   clearAuth()
                   navigate('/login')

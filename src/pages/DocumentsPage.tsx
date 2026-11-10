@@ -1,3 +1,11 @@
+/**
+ * 文档列表页：按标题/状态筛选并分页展示文档，提供新建、上传解析和行内发布。
+ * 关键交互：查询、翻页、操作后刷新都走 load()，分页参数 page/pageSize 交给后端；
+ * 上传解析用 FormData 提交到 /documents/upload/parse，产出是并列的草稿记录，完成后跳编辑页。
+ * 坑 1：load() 读的是闭包里的 title/status，改完筛选条件必须显式调用 load(1)，不会自动重新请求。
+ * 坑 2：beforeUpload 必须返回 false 拦掉 antd 的默认上传，否则同一个文件会被传两次；
+ * 而按钮按状态/权限隐藏只是体验，发布等接口后端仍会校验权限和状态。
+ */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Input, Select, Space, Table, Tag, Upload, message } from 'antd'
@@ -19,6 +27,7 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(false)
   const pageSize = 10
 
+  // 统一加载入口：带上当前筛选条件和目标页，成功后同步列表、总数与页码
   async function load(nextPage = page) {
     setLoading(true)
     try {
@@ -38,6 +47,7 @@ export default function DocumentsPage() {
     }
   }
 
+  // 首次进入只加载第一页；筛选条件变化由查询按钮或回车手动触发
   useEffect(() => {
     void load(1)
   }, [])
@@ -73,6 +83,7 @@ export default function DocumentsPage() {
             <Upload
               showUploadList={false}
               beforeUpload={async (file) => {
+                // 以 FormData 提交原文件，后端解析出一条并列的草稿记录，成功后跳编辑页继续补内容
                 const form = new FormData()
                 form.append('file', file)
                 form.append('isPublic', 'true')
@@ -140,6 +151,7 @@ export default function DocumentsPage() {
                 {can(user, 'document:edit') && row.status === 0 ? (
                   <a
                     onClick={async () => {
+                      // 只有草稿可发布；成功后重新拉当前页，开启审核时状态会变成待审核
                       try {
                         await documentApi.publish(row.id)
                         message.success('已提交发布')

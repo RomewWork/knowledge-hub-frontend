@@ -1,3 +1,10 @@
+/**
+ * 个人中心：顶部三项统计 + 资料表单 + 改密表单。
+ * 关键交互：保存资料后同步刷新 auth 里的用户对象，顶部导航/头像才会立即变；
+ * 改密必须带原密码，成功后只重置改密表单，资料表单保持原样。
+ * 坑 1：资料表单的初始值来自 useAuth()，必须放进 effect 跟随 user 同步，否则刚改完不刷新；
+ * 坑 2：统计接口失败被静默吞掉（catch 返回 undefined），页面仍可用，不要改成阻塞渲染。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Card, Col, Form, Input, Row, Statistic, message } from 'antd'
 import { userApi } from '../api'
@@ -11,6 +18,7 @@ export default function ProfilePage() {
   const [profileForm] = Form.useForm()
   const [pwdForm] = Form.useForm()
 
+  // 统计与资料初始值一起同步：user 变化（比如刚保存完资料）就重新回填一次表单
   useEffect(() => {
     userApi.stats().then(setStats).catch(() => undefined)
     profileForm.setFieldsValue({
@@ -39,6 +47,7 @@ export default function ProfilePage() {
           style={{ maxWidth: 420 }}
           onFinish={async (values: { realName?: string; email?: string }) => {
             try {
+              // 先落库再更新本地 auth 用户，顺序反了会出现「提交失败但界面已改」
               await userApi.updateMe(values)
               if (user) {
                 updateUser({ ...user, realName: values.realName, email: values.email })
@@ -70,6 +79,7 @@ export default function ProfilePage() {
           style={{ maxWidth: 420 }}
           onFinish={async (values: { oldPassword: string; newPassword: string }) => {
             try {
+              // 成功后只重置改密表单；失败保留输入（原密码错要让用户就地改），不要无条件 reset
               await userApi.changePassword(values.oldPassword, values.newPassword)
               message.success('密码已修改')
               pwdForm.resetFields()

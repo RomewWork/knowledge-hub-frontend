@@ -1,3 +1,11 @@
+/**
+ * 图谱页：左侧力导向画布 + 右侧统计、类型分布、排行榜与节点卡片。
+ * 关键交互：进页面调一次 /graph/overview 拿全景（nodes + edges + stats），
+ * 工具栏的关键词、节点类型、时间范围都走同一个接口刷新；点击节点在右侧卡片展开，
+ * 文档节点可跳 /documents/:documentId。
+ * 坑 1：echarts 容器必须有确定高度（由 .kh-graph-canvas 提供），否则图表直接不渲染；
+ * 坑 2：ForceGraph 的 effect 依赖 nodes/edges，重渲染前要 dispose 旧实例，否则实例叠加泄漏。
+ */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -15,6 +23,7 @@ import ForceGraph, { EntityTypePie, type GraphChartHandle } from '../components/
 import type { GraphOverview, GraphViewNode } from '../types'
 import { formatTime } from '../utils'
 
+// 首屏占位数据：让右侧统计在接口回来前也能安全读 stats.xxx，不会取到 undefined
 const emptyOverview: GraphOverview = {
   nodes: [],
   edges: [],
@@ -45,6 +54,7 @@ export default function GraphPage() {
   const [selected, setSelected] = useState<GraphViewNode | null>(null)
   const chartRef = useRef<GraphChartHandle | null>(null)
 
+  // next 里显式传 null 表示“清空该筛选项”，与「没传、沿用当前 state」区分开
   async function load(next?: {
     keyword?: string
     entityType?: string | null
@@ -69,10 +79,12 @@ export default function GraphPage() {
     }
   }
 
+  // 仅首屏拉全量；之后的检索、重置由按钮/回车触发，避免每次输入都打接口
   useEffect(() => {
     void load()
   }, [])
 
+  // 类型下拉直接复用后端返回的 entityTypes，前端不维护枚举
   const typeOptions = data.entityTypes.map((t) => ({ value: t, label: t }))
 
   return (
@@ -99,6 +111,7 @@ export default function GraphPage() {
             }}
             options={typeOptions}
           />
+          {/* 重置时改 key 强制重建选择器，否则内部展示的日期清不掉 */}
           <DatePicker.RangePicker
             key={pickerKey}
             onChange={(dates) => {
@@ -127,11 +140,13 @@ export default function GraphPage() {
             检索
           </Button>
           <div style={{ flex: 1 }} />
+          {/* 导出与缩放都通过 chartRef 句柄调用，页面不直接持有 echarts 实例 */}
           <Button icon={<DownloadOutlined />} onClick={() => chartRef.current?.exportPng()}>
             导出图谱
           </Button>
         </div>
         <div className="kh-graph-canvas">
+          {/* 有节点才挂图表，空态交给 Spin/Empty，避免 echarts 在空数据上初始化 */}
           {data.nodes.length ? (
             <ForceGraph
               nodes={data.nodes}

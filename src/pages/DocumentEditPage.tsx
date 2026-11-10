@@ -1,3 +1,10 @@
+/**
+ * 文档编辑页：新建与编辑复用同一个表单，编辑时按路由 id 回填原内容。
+ * 关键交互：新建调用 create 且状态固定为 0 草稿，编辑调用 update 只更新内容；保存成功后跳详情页。
+ * 上传解析（/documents/upload/parse）产出的并列草稿记录也会进到这里，继续补正文再发布。
+ * 坑 1：保存按钮不会发布，想让文档可见还要走发布接口；开启审核时发布只是提审，状态为 3 待审核。
+ * 坑 2：表单值统一由 Form.useForm() 管理，不要再额外用 useState 镜像一份，否则回填和提交容易不同步。
+ */
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Form, Input, Spin, Switch, message } from 'antd'
@@ -11,6 +18,7 @@ export default function DocumentEditPage() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(!isNew)
 
+  // 编辑模式回填表单；id 为空表示新建，直接跳过请求
   useEffect(() => {
     if (!id) return
     documentApi
@@ -52,6 +60,7 @@ export default function DocumentEditPage() {
           isPublic: boolean
           content: string
         }) => {
+          // 新建只创建草稿，编辑只更新内容；状态变化统一交给发布/下架/归档接口
           try {
             if (isNew) {
               const created = await documentApi.create({

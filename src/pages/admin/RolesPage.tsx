@@ -1,9 +1,17 @@
+/**
+ * 角色管理：角色表格 + 新建角色弹窗 + 权限树分配。
+ * 关键交互：点「权限」先拉该角色已勾选的权限 id 回填 Tree，保存时整份覆盖提交；
+ * 新建角色走 roleApi.create，成功后重拉列表。
+ * 坑 1：Tree 的 onCheck 在 checkStrictly 下返回 {checked}，否则是数组，两种都要兼容；
+ * 坑 2：本页要求 ADMIN，接口层还会再校验一次。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Table, Tree, message } from 'antd'
 import { permissionApi, roleApi } from '../../api'
 import { ApiError } from '../../api/client'
 import type { PermissionNode, RoleItem } from '../../types'
 
+// 把权限树转成 antd Tree 需要的 { title, key, children }，标题带上编码便于排查
 function toTree(nodes: PermissionNode[]): { title: string; key: string; children?: ReturnType<typeof toTree> }[] {
   return nodes.map((n) => ({
     title: `${n.permissionName} (${n.permissionCode})`,
@@ -20,6 +28,7 @@ export default function RolesPage() {
   const [checked, setChecked] = useState<string[]>([])
   const [form] = Form.useForm()
 
+  // 角色列表不分页，一次全量拉回
   async function load() {
     try {
       setItems(await roleApi.list())
@@ -28,6 +37,7 @@ export default function RolesPage() {
     }
   }
 
+  // 首屏并行拉角色与权限树，权限树失败不影响列表展示
   useEffect(() => {
     void load()
     permissionApi.tree().then(setTree).catch(() => undefined)
@@ -117,6 +127,7 @@ export default function RolesPage() {
           checkable
           checkedKeys={checked}
           onCheck={(keys) => {
+            // 未开 checkStrictly 时 antd 返回数组，开了返回 { checked }，两种都兜住
             const list = Array.isArray(keys) ? keys : keys.checked
             setChecked(list.map(String))
           }}

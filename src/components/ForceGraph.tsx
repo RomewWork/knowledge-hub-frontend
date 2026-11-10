@@ -1,3 +1,10 @@
+/**
+ * 知识图谱可视化：echarts 力导向图 + 知识点类型分布环形图。
+ * 关键交互：通过 chartRef 向外暴露 zoomIn/zoomOut/reset/exportPng，页面工具栏直接调；
+ * 点击节点回调 onNodeClick，由页面决定弹卡片还是跳文档。
+ * 坑 1：容器必须有确定高度，尺寸小于 80 时不初始化，否则 echarts 算出 0 高度直接白屏；
+ * 坑 2：effect 依赖 nodes/edges，重跑前必须 dispose 旧实例，不然 canvas 和 ResizeObserver 会叠加泄漏。
+ */
 import { useEffect, useRef, type RefObject } from 'react'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
@@ -187,6 +194,7 @@ export default function ForceGraph({ nodes, edges, onNodeClick, chartRef }: Prop
   const elRef = useRef<HTMLDivElement>(null)
   const clickRef = useRef(onNodeClick)
   const nodesRef = useRef(nodes)
+  // 回调与节点数据放 ref：effect 就不必依赖它们，避免父组件每次重渲染都重建整张图
   clickRef.current = onNodeClick
   nodesRef.current = nodes
 
@@ -198,6 +206,7 @@ export default function ForceGraph({ nodes, edges, onNodeClick, chartRef }: Prop
     let disposed = false
     let lastSize = { w: 0, h: 0 }
 
+    // 首次建实例并绑 click / chartRef；之后尺寸变化只 resize，重画交给依赖变化触发的重建
     const render = () => {
       if (disposed || el.clientWidth < 80 || el.clientHeight < 80) return
       const sizeChanged = el.clientWidth !== lastSize.w || el.clientHeight !== lastSize.h
@@ -239,6 +248,7 @@ interface PieProps {
 export function EntityTypePie({ items }: PieProps) {
   const elRef = useRef<HTMLDivElement>(null)
 
+  // 环形图只做展示：items 一变就重设 option，items 为空时给一个「暂无」占位扇区
   useEffect(() => {
     const el = elRef.current
     if (!el) return

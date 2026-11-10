@@ -1,3 +1,10 @@
+/**
+ * 检索页：按关键词全文检索文档，支持分类、作者和状态过滤，分页展示命中的标题与片段。
+ * 关键交互：POST /search 返回 highlight.{title,summary,content}，页面用 safeHighlight 清洗后再
+ * dangerouslySetInnerHTML 渲染；点击标题跳详情页，全文不在列表里返回。
+ * 坑 1：状态筛选是拿到当前页结果后在前端 filter，total 会跟着变小，跨页结果并不完整。
+ * 坑 2：highlight 里含 <em>，必须经 safeHighlight 转义后渲染，直接把后端字符串塞进 innerHTML 会有 XSS 风险。
+ */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -25,6 +32,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [elapsed, setElapsed] = useState<number | null>(null)
 
+  // 检索入口：空关键词只提示不发请求，成功记录耗时用于展示，失败统一 message 提示
   async function runSearch(nextPage = 1) {
     const q = keyword.trim()
     if (!q) {
@@ -41,6 +49,7 @@ export default function SearchPage() {
         authorId: authorId || undefined,
         categoryId: categoryId || undefined,
       })
+      // 状态过滤在当前页做，所以 total 只能用过滤后的条数，翻页时要注意这个偏差
       const filtered = status === undefined ? res.items : res.items.filter((x) => x.status === status)
       setItems(filtered)
       setTotal(status === undefined ? res.total : filtered.length)
@@ -120,10 +129,12 @@ export default function SearchPage() {
       {!items.length && elapsed !== null ? <Empty description="没有匹配的已发布文档" /> : null}
 
       {items.map((hit) => {
+        // 列表只回传高亮片段，没有全文；完整正文要点进详情页再请求
         const titleHtml = hit.highlight.title[0] || hit.title
         const snippet =
           hit.highlight.content[0] || hit.highlight.summary[0] || hit.summary || ''
         const statusMeta = hit.status != null ? DOC_STATUS[hit.status] : undefined
+        // 高亮串里只有 em 是可信标签，先用 safeHighlight 转义再交给 innerHTML
         return (
           <div className="kh-hit" key={hit.id}>
             <div className="kh-hit-icon">

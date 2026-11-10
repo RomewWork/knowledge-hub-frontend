@@ -1,3 +1,10 @@
+/**
+ * 审核队列：按状态（待审/已通过/已驳回）翻文档审核任务。
+ * 关键交互：切换状态下拉即重拉第一页；通过可直接提交，驳回必须填意见，
+ * 两者共用同一个弹窗，由 action 区分提交到 approve 还是 reject。
+ * 坑 1：本页要求 REVIEWER 或 ADMIN，接口层还会再校验一次；
+ * 坑 2：只有 reviewResult 为空的任务才显示操作，已审的不能再点。
+ */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button, Input, Modal, Select, Space, Table, Tag, message } from 'antd'
@@ -16,6 +23,7 @@ export default function ReviewsPage() {
   const [action, setAction] = useState<'approve' | 'reject'>('approve')
   const [comment, setComment] = useState('')
 
+  // 当前状态 + 页码决定列表；翻页不重置状态，但切状态要回到第一页
   async function load(nextPage = page) {
     setLoading(true)
     try {
@@ -30,6 +38,7 @@ export default function ReviewsPage() {
     }
   }
 
+  // 状态变化就重查第一页，避免停在旧页码上出现空表
   useEffect(() => {
     void load(1)
   }, [status])
@@ -98,6 +107,7 @@ export default function ReviewsPage() {
           },
         ]}
       />
+      {/* 通过/驳回共用同一个弹窗，靠 action 区分；驳回时意见必须非空 */}
       <Modal
         title={action === 'approve' ? '审核通过' : '审核驳回'}
         open={Boolean(task)}

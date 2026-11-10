@@ -1,3 +1,10 @@
+/**
+ * 登录页：账号密码登录入口。
+ * 关键交互：提交表单调用 authApi.login，成功后 setAuth 写入 token 与用户信息并跳转 /dashboard；
+ * 失败用 message.error 提示，ApiError 优先展示后端文案。
+ * 坑 1：跳转用 replace，避免用户回退又回到登录页；登录态只代表身份，权限仍以后端 @RequirePermission 为准。
+ * 坑 2：表单 initialValues 里是演示账号，接入真实环境前应去掉，否则等于把口令写死在前端。
+ */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Form, Input, message } from 'antd'
@@ -25,6 +32,7 @@ export default function LoginPage() {
             setLoading(true)
             try {
               const result = await authApi.login(values.username, values.password)
+              // 先落地本地认证信息再跳转，避免目标页读不到 token
               setAuth({
                 accessToken: result.accessToken,
                 refreshToken: result.refreshToken,

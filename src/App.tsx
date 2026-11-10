@@ -1,3 +1,11 @@
+/**
+ * 职责：路由表与访问控制：Guard 拦游客，Perm 按权限码拦越权，admin 域再按角色收敛。
+ * 依赖：./auth 的 useAuth、./utils 的 can/isAdmin/isReviewer、pages 下各页面。
+ * 坑：
+ * 1. 所有业务路由都嵌在 AppLayout 之下，靠它的 Outlet 渲染，父路由 element 不能漏；
+ * 2. 前端守卫只是体验优化，不是安全边界，接口仍必须由后端鉴权；
+ * 3. 未匹配路径按登录态分流到 /dashboard 或 /login，避免刷新后白屏。
+ */
 import { Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from './auth'
@@ -17,12 +25,14 @@ import TeamsPage from './pages/admin/TeamsPage'
 import ReviewsPage from './pages/admin/ReviewsPage'
 import { can, isAdmin, isReviewer } from './utils'
 
+// 登录态守卫：未登录统一回登录页，replace 避免用户点返回又弹回来
 function Guard({ children }: { children: ReactNode }) {
   const user = useAuth()
   if (!user) return <Navigate to="/login" replace />
   return children
 }
 
+// 权限守卫：无权限时退回大盘，而不是渲染空白页
 function Perm({ code, children }: { code: string; children: ReactNode }) {
   const user = useAuth()
   if (!can(user, code)) return <Navigate to="/dashboard" replace />

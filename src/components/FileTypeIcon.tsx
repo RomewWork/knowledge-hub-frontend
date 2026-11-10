@@ -1,3 +1,10 @@
+/**
+ * 文件类型图标：按后缀画一个带字母的圆角色块，纯展示组件、无副作用。
+ * 关键交互：extFromName 统一解析后缀（兼容 Windows 反斜杠路径），未识别一律按 md，
+ * 所以调用方永远拿得到图标；fileTypeLabel 供需要文字标签的场景使用。
+ * 坑 1：后缀判断要求 lastIndexOf('.') > 0，隐藏文件（如 .env）不会被误当成后缀；
+ * 坑 2：图标是 SVG text，各类型字母长度不同，因此 ICONS 里逐个配了 fontSize。
+ */
 const ICONS: Record<string, { bg: string; label: string; fontSize: number }> = {
   pdf: { bg: '#E53935', label: 'PDF', fontSize: 7 },
   doc: { bg: '#1E88E5', label: 'W', fontSize: 11 },

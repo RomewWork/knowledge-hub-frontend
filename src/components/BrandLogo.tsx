@@ -1,3 +1,9 @@
+/**
+ * 品牌标：中心节点向外辐射的 SVG，纯展示组件、无副作用。
+ * 关键交互：只接受 size，由调用方按场景传值（导航栏、登录页各用一个尺寸）。
+ * 坑 1：根节点带 aria-hidden，放在按钮里时无障碍名称要由外层提供；
+ * 坑 2：display:block 加 flexShrink:0，避免在 flex 行内被压扁或出现基线空隙。
+ */
 /** Knowledge Hub 品牌标：中心节点向外辐射，表示知识汇聚 */
 export function BrandLogo({ size = 28 }: { size?: number }) {
   return (
