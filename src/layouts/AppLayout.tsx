@@ -6,8 +6,8 @@
  * 2. topKey 是对 pathname 的归一化映射（/admin/reviews 归到文档域），不要直接拿 pathname 去匹配一级菜单；
  * 3. 挂载时的 /me 只用于刷新用户信息，失败必须静默，不能因为网络抖动把用户踢下线。
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   ApartmentOutlined,
   BellOutlined,
@@ -23,103 +23,108 @@ import {
   SettingOutlined,
   TeamOutlined,
   UserOutlined,
-} from '@ant-design/icons'
-import { Avatar, Badge, Dropdown, Layout, Menu, theme } from 'antd'
-import type { MenuProps } from 'antd'
-import { authApi } from '../api'
-import { clearAuth, updateUser, useAuth } from '../auth'
-import { can, displayName, isAdmin, isReviewer } from '../utils'
-import { BrandLogo } from '../components/BrandLogo'
+} from '@ant-design/icons';
+import { Avatar, Badge, Dropdown, Layout, Menu, Tag, theme } from 'antd';
+import type { MenuProps } from 'antd';
+import { authApi, teamApi } from '../api';
+import { clearAuth, updateUser, useAuth } from '../auth';
+import { can, displayName, isAdmin, isReviewer } from '../utils';
+import { BrandLogo } from '../components/BrandLogo';
+import type { TeamItem } from '../types';
 
-const { Header, Sider, Content } = Layout
+const { Header, Sider, Content } = Layout;
 
-type MenuItem = NonNullable<MenuProps['items']>[number]
+type MenuItem = NonNullable<MenuProps['items']>[number];
 
 export default function AppLayout() {
-  const user = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
+  const user = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+  const [myTeams, setMyTeams] = useState<TeamItem[]>([]);
   const {
     token: { colorBgContainer },
-  } = theme.useToken()
+  } = theme.useToken();
 
-  // 用最新的 /me 结果覆盖本地缓存的 roles/permissions，防止后台改权限后前端一直用旧值
   useEffect(() => {
-    authApi.me().then(updateUser).catch(() => undefined)
-  }, [])
+    authApi
+      .me()
+      .then(updateUser)
+      .catch(() => undefined);
+    teamApi
+      .mine()
+      .then(setMyTeams)
+      .catch(() => undefined);
+  }, []);
 
-  // 把具体路径收敛成一级菜单的 key，顶栏高亮与侧栏内容都依赖它
   const topKey = useMemo(() => {
-    if (location.pathname.startsWith('/documents') || location.pathname.startsWith('/admin/reviews')) {
-      return '/documents'
+    if (
+      location.pathname.startsWith('/documents') ||
+      location.pathname.startsWith('/admin/reviews')
+    ) {
+      return '/documents';
     }
-    if (location.pathname.startsWith('/search')) return '/search'
-    if (location.pathname.startsWith('/chat')) return '/chat'
-    if (location.pathname.startsWith('/graph')) return '/graph'
-    if (location.pathname.startsWith('/profile')) return '/profile'
-    if (location.pathname.startsWith('/admin')) return '/admin'
-    return '/dashboard'
-  }, [location.pathname])
+    if (location.pathname.startsWith('/search')) return '/search';
+    if (location.pathname.startsWith('/chat')) return '/chat';
+    if (location.pathname.startsWith('/graph')) return '/graph';
+    if (location.pathname.startsWith('/profile')) return '/profile';
+    if (location.pathname.startsWith('/admin')) return '/admin';
+    return '/dashboard';
+  }, [location.pathname]);
 
   const topItems = useMemo(() => {
-    const items: MenuItem[] = [
-      { key: '/dashboard', label: '首页大盘', icon: <HomeOutlined /> },
-    ]
+    const items: MenuItem[] = [{ key: '/dashboard', label: '首页大盘', icon: <HomeOutlined /> }];
     if (can(user, 'document:list')) {
-      items.push({ key: '/documents', label: '文档管理', icon: <FileTextOutlined /> })
+      items.push({ key: '/documents', label: '文档管理', icon: <FileTextOutlined /> });
     }
     if (can(user, 'search')) {
-      items.push({ key: '/search', label: '文档搜索', icon: <SearchOutlined /> })
-      items.push({ key: '/chat', label: 'AI智能问答', icon: <MessageOutlined /> })
-      items.push({ key: '/graph', label: '知识图谱', icon: <ClusterOutlined /> })
+      items.push({ key: '/search', label: '文档搜索', icon: <SearchOutlined /> });
+      items.push({ key: '/chat', label: 'AI智能问答', icon: <MessageOutlined /> });
+      items.push({ key: '/graph', label: '知识图谱', icon: <ClusterOutlined /> });
     }
     if (can(user, 'profile')) {
-      items.push({ key: '/profile', label: '个人中心', icon: <UserOutlined /> })
+      items.push({ key: '/profile', label: '个人中心', icon: <UserOutlined /> });
     }
     if (isAdmin(user)) {
-      items.push({ key: '/admin/users', label: '系统管理', icon: <SettingOutlined /> })
+      items.push({ key: '/admin/users', label: '系统管理', icon: <SettingOutlined /> });
     }
-    return items
-  }, [user])
+    return items;
+  }, [user]);
 
-  // 侧栏只展示当前一级域下的二级入口，故按 topKey 分支返回标题与 items
   const side = useMemo(() => {
     if (topKey === '/documents') {
       const items: MenuItem[] = [
-        { key: '/documents', icon: <ReadOutlined />, label: '全部文档' },
+        { key: '/documents', icon: <ReadOutlined />, label: '可见文档' },
         { key: '/documents/new', icon: <FileTextOutlined />, label: '新建文档' },
-      ]
+      ];
       if (isReviewer(user)) {
-        items.push({ key: '/admin/reviews', icon: <BellOutlined />, label: '审核工作台' })
+        items.push({ key: '/admin/reviews', icon: <BellOutlined />, label: '审核工作台' });
       }
-      return { title: '文档管理', items }
+      return { title: '文档管理', items };
     }
     if (topKey === '/search') {
       return {
         title: '文档搜索',
         items: [{ key: '/search', icon: <SearchOutlined />, label: '全文检索' }],
-      }
+      };
     }
     if (topKey === '/chat') {
       return {
         title: 'AI智能问答',
         items: [{ key: '/chat', icon: <MessageOutlined />, label: '知识问答' }],
-      }
+      };
     }
     if (topKey === '/graph') {
       return {
         title: '知识图谱',
-        items: [
-          { key: '/graph', icon: <ApartmentOutlined />, label: '全景图谱' },
-        ],
-      }
+        items: [{ key: '/graph', icon: <ApartmentOutlined />, label: '全景图谱' }],
+      };
     }
     if (topKey === '/profile') {
       return {
         title: '个人中心',
         items: [{ key: '/profile', icon: <UserOutlined />, label: '账号资料' }],
-      }
+      };
     }
     if (topKey === '/admin') {
       return {
@@ -129,32 +134,31 @@ export default function AppLayout() {
           { key: '/admin/roles', icon: <SafetyCertificateOutlined />, label: '角色权限' },
           { key: '/admin/teams', icon: <TeamOutlined />, label: '团队管理' },
         ],
-      }
+      };
     }
     return {
       title: '首页大盘',
       items: [{ key: '/dashboard', icon: <HomeOutlined />, label: '工作概览' }],
-    }
-  }, [topKey, user])
+    };
+  }, [topKey, user]);
 
   return (
-    <Layout className="kh-root">
-      <Header className="kh-header" style={{ background: colorBgContainer }}>
-        <div className="kh-logo" onClick={() => navigate('/dashboard')}>
+    <Layout className='kh-root'>
+      <Header className='kh-header' style={{ background: colorBgContainer }}>
+        <div className='kh-logo' onClick={() => navigate('/dashboard')}>
           <BrandLogo />
-          <span className="kh-logo-text">Knowledge Hub</span>
+          <span className='kh-logo-text'>Knowledge Hub</span>
         </div>
-        {/* 一级菜单里“系统管理”的 key 是 /admin/users，而 topKey 被归一成 /admin，这里换回菜单项 key */}
         <Menu
-          className="kh-top-menu"
-          mode="horizontal"
+          className='kh-top-menu'
+          mode='horizontal'
           selectedKeys={[topKey === '/admin' ? '/admin/users' : topKey]}
           items={topItems}
           onClick={({ key }) => navigate(key)}
         />
-        <div className="kh-header-right">
+        <div className='kh-header-right'>
           {isReviewer(user) ? (
-            <Badge size="small" className="kh-bell">
+            <Badge size='small' className='kh-bell'>
               <BellOutlined
                 style={{ fontSize: 18, cursor: 'pointer' }}
                 onClick={() => navigate('/admin/reviews')}
@@ -165,57 +169,58 @@ export default function AppLayout() {
             menu={{
               items: [
                 ...(can(user, 'profile')
-                  ? [
-                      { key: 'profile', label: '个人中心' },
-                      { type: 'divider' as const },
-                    ]
+                  ? [{ key: 'profile', label: '个人中心' }, { type: 'divider' as const }]
                   : []),
                 { key: 'logout', label: '退出登录' },
               ],
               onClick: ({ key }) => {
-                if (key === 'profile') navigate('/profile')
+                if (key === 'profile') navigate('/profile');
                 if (key === 'logout') {
-                  // 不等接口返回就先清本地登录态，避免弱网下退出看起来"没反应"
-                  authApi.logout().catch(() => undefined)
-                  clearAuth()
-                  navigate('/login')
+                  authApi.logout().catch(() => undefined);
+                  clearAuth();
+                  navigate('/login');
                 }
               },
             }}
           >
-            <div className="kh-user">
+            <div className='kh-user'>
               <Avatar size={28} icon={<UserOutlined />} src={user?.avatar || undefined} />
               <span>{displayName(user)}</span>
+              {myTeams.slice(0, 2).map((team) => (
+                <Tag key={team.id} style={{ marginInlineEnd: 0 }}>
+                  {team.teamName}
+                </Tag>
+              ))}
             </div>
           </Dropdown>
         </div>
       </Header>
       <Layout>
         <Sider
-          className="kh-sider"
-          theme="light"
+          className='kh-sider'
+          theme='light'
           width={220}
           collapsedWidth={64}
           collapsible
           collapsed={collapsed}
           trigger={null}
         >
-          {!collapsed ? <div className="kh-sider-title">{side.title}</div> : null}
+          {!collapsed ? <div className='kh-sider-title'>{side.title}</div> : null}
           <Menu
-            mode="inline"
+            mode='inline'
             selectedKeys={[location.pathname]}
             items={side.items}
             onClick={({ key }) => navigate(key)}
           />
-          <div className="kh-sider-bottom" onClick={() => setCollapsed((v) => !v)}>
+          <div className='kh-sider-bottom' onClick={() => setCollapsed((v) => !v)}>
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             {!collapsed ? <span>收起菜单</span> : null}
           </div>
         </Sider>
-        <Content className="kh-content">
+        <Content className='kh-content'>
           <Outlet />
         </Content>
       </Layout>
     </Layout>
-  )
+  );
 }

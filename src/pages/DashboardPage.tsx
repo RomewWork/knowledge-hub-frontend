@@ -5,59 +5,62 @@
  * 坑 1：统计和列表请求都用 catch(() => undefined) 吞掉异常，接口失败时页面只显示 0 或空表，不会提示。
  * 坑 2：这里用 can() 隐藏入口只是体验优化，越权访问的兜底在后端 @RequirePermission，不能当安全边界。
  */
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ClusterOutlined,
   FileTextOutlined,
   MessageOutlined,
   SearchOutlined,
-} from '@ant-design/icons'
-import { Card, Col, Row, Statistic, Table, Tag } from 'antd'
-import { documentApi, userApi } from '../api'
-import type { DocumentItem, UserStats } from '../types'
-import { useAuth } from '../auth'
-import { DOC_STATUS, can, formatTime } from '../utils'
-import { FileTypeIcon } from '../components/FileTypeIcon'
+} from '@ant-design/icons';
+import { Card, Col, Row, Statistic, Table, Tag } from 'antd';
+import { documentApi, userApi } from '../api';
+import type { DocumentItem, UserStats } from '../types';
+import { useAuth } from '../auth';
+import { DOC_STATUS, can, formatTime, visibilityMeta } from '../utils';
+import { FileTypeIcon } from '../components/FileTypeIcon';
 
 export default function DashboardPage() {
-  const user = useAuth()
-  const navigate = useNavigate()
-  const [stats, setStats] = useState<UserStats | null>(null)
-  const [docs, setDocs] = useState<DocumentItem[]>([])
+  const user = useAuth();
+  const navigate = useNavigate();
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [docs, setDocs] = useState<DocumentItem[]>([]);
 
   // 进入页面时加载统计数据与最近文档；没有 document:list 权限就不请求列表
   useEffect(() => {
-    userApi.stats().then(setStats).catch(() => undefined)
+    userApi
+      .stats()
+      .then(setStats)
+      .catch(() => undefined);
     if (can(user, 'document:list')) {
       documentApi
         .list({ page: 1, pageSize: 8 })
         .then((res) => setDocs(res.items))
-        .catch(() => undefined)
+        .catch(() => undefined);
     }
-  }, [user])
+  }, [user]);
 
   return (
     <div>
       <Row gutter={16}>
         <Col span={6}>
           <Card>
-            <Statistic title="我的文档" value={stats?.documentCount ?? 0} />
+            <Statistic title='我的文档' value={stats?.documentCount ?? 0} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="浏览合计" value={stats?.viewCount ?? 0} />
+            <Statistic title='浏览合计' value={stats?.viewCount ?? 0} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="点赞合计" value={stats?.likeCount ?? 0} />
+            <Statistic title='点赞合计' value={stats?.likeCount ?? 0} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="评论合计" value={stats?.commentCount ?? 0} />
+            <Statistic title='评论合计' value={stats?.commentCount ?? 0} />
           </Card>
         </Col>
       </Row>
@@ -89,11 +92,11 @@ export default function DashboardPage() {
           </>
         ) : null}
       </Row>
-      <div className="kh-page" style={{ marginTop: 16, minHeight: 0 }}>
-        <h3 style={{ marginTop: 0 }}>最近文档</h3>
+      <div className='kh-page' style={{ marginTop: 16, minHeight: 0 }}>
+        <h3 style={{ marginTop: 0 }}>最近可见文档</h3>
         <Table
-          rowKey="id"
-          size="middle"
+          rowKey='id'
+          size='middle'
           pagination={false}
           dataSource={docs}
           columns={[
@@ -111,6 +114,14 @@ export default function DashboardPage() {
               ),
             },
             {
+              title: '可见性',
+              width: 110,
+              render: (_: unknown, row: DocumentItem) => {
+                const vis = visibilityMeta(row);
+                return <Tag color={vis.color}>{vis.label}</Tag>;
+              },
+            },
+            {
               title: '状态',
               dataIndex: 'status',
               width: 100,
@@ -124,5 +135,5 @@ export default function DashboardPage() {
         />
       </div>
     </div>
-  )
+  );
 }

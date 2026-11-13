@@ -6,8 +6,8 @@
  * 坑 1：echarts 容器必须有确定高度（由 .kh-graph-canvas 提供），否则图表直接不渲染；
  * 坑 2：ForceGraph 的 effect 依赖 nodes/edges，重渲染前要 dispose 旧实例，否则实例叠加泄漏。
  */
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CompressOutlined,
   DownloadOutlined,
@@ -15,13 +15,13 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-} from '@ant-design/icons'
-import { Button, DatePicker, Empty, Input, Select, Space, Spin, message } from 'antd'
-import { graphApi } from '../api'
-import { ApiError } from '../api/client'
-import ForceGraph, { EntityTypePie, type GraphChartHandle } from '../components/ForceGraph'
-import type { GraphOverview, GraphViewNode } from '../types'
-import { formatTime } from '../utils'
+} from '@ant-design/icons';
+import { Button, DatePicker, Empty, Input, Select, Space, Spin, message } from 'antd';
+import { graphApi } from '../api';
+import { ApiError } from '../api/client';
+import ForceGraph, { EntityTypePie, type GraphChartHandle } from '../components/ForceGraph';
+import type { GraphOverview, GraphViewNode } from '../types';
+import { formatTime } from '../utils';
 
 // 首屏占位数据：让右侧统计在接口回来前也能安全读 stats.xxx，不会取到 undefined
 const emptyOverview: GraphOverview = {
@@ -40,28 +40,28 @@ const emptyOverview: GraphOverview = {
   topEntities: [],
   recentNodes: [],
   entityTypes: [],
-}
+};
 
 export default function GraphPage() {
-  const navigate = useNavigate()
-  const [keyword, setKeyword] = useState('')
-  const [entityType, setEntityType] = useState<string>()
-  const [from, setFrom] = useState<string>()
-  const [to, setTo] = useState<string>()
-  const [data, setData] = useState<GraphOverview>(emptyOverview)
-  const [loading, setLoading] = useState(false)
-  const [pickerKey, setPickerKey] = useState(0)
-  const [selected, setSelected] = useState<GraphViewNode | null>(null)
-  const chartRef = useRef<GraphChartHandle | null>(null)
+  const navigate = useNavigate();
+  const [keyword, setKeyword] = useState('');
+  const [entityType, setEntityType] = useState<string>();
+  const [from, setFrom] = useState<string>();
+  const [to, setTo] = useState<string>();
+  const [data, setData] = useState<GraphOverview>(emptyOverview);
+  const [loading, setLoading] = useState(false);
+  const [pickerKey, setPickerKey] = useState(0);
+  const [selected, setSelected] = useState<GraphViewNode | null>(null);
+  const chartRef = useRef<GraphChartHandle | null>(null);
 
   // next 里显式传 null 表示“清空该筛选项”，与「没传、沿用当前 state」区分开
   async function load(next?: {
-    keyword?: string
-    entityType?: string | null
-    from?: string | null
-    to?: string | null
+    keyword?: string;
+    entityType?: string | null;
+    from?: string | null;
+    to?: string | null;
   }) {
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await graphApi.overview({
         keyword: (next?.keyword ?? keyword).trim() || undefined,
@@ -69,32 +69,32 @@ export default function GraphPage() {
         from: (next && 'from' in next ? next.from : from) || undefined,
         to: (next && 'to' in next ? next.to : to) || undefined,
         docLimit: 24,
-      })
-      setData(res)
-      setSelected(null)
+      });
+      setData(res);
+      setSelected(null);
     } catch (error) {
-      message.error(error instanceof ApiError ? error.message : '图谱加载失败')
+      message.error(error instanceof ApiError ? error.message : '图谱加载失败');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   // 仅首屏拉全量；之后的检索、重置由按钮/回车触发，避免每次输入都打接口
   useEffect(() => {
-    void load()
-  }, [])
+    void load();
+  }, []);
 
   // 类型下拉直接复用后端返回的 entityTypes，前端不维护枚举
-  const typeOptions = data.entityTypes.map((t) => ({ value: t, label: t }))
+  const typeOptions = data.entityTypes.map((t) => ({ value: t, label: t }));
 
   return (
-    <div className="kh-graph-layout">
-      <div className="kh-graph-main">
-        <div className="kh-graph-toolbar">
+    <div className='kh-graph-layout'>
+      <div className='kh-graph-main'>
+        <div className='kh-graph-toolbar'>
           <Input
             allowClear
             prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-            placeholder="输入关键词检索图谱…"
+            placeholder='输入关键词检索你有权限的图谱…'
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onPressEnter={() => void load()}
@@ -102,51 +102,50 @@ export default function GraphPage() {
           />
           <Select
             allowClear
-            placeholder="节点类型"
+            placeholder='节点类型'
             style={{ width: 150 }}
             value={entityType}
             onChange={(v) => {
-              setEntityType(v)
-              void load({ entityType: v ?? null })
+              setEntityType(v);
+              void load({ entityType: v ?? null });
             }}
             options={typeOptions}
           />
-          {/* 重置时改 key 强制重建选择器，否则内部展示的日期清不掉 */}
           <DatePicker.RangePicker
             key={pickerKey}
             onChange={(dates) => {
-              setFrom(dates?.[0]?.toISOString())
-              setTo(dates?.[1]?.toISOString())
+              setFrom(dates?.[0]?.toISOString());
+              setTo(dates?.[1]?.toISOString());
             }}
           />
           <Button
             onClick={() => {
-              setKeyword('')
-              setEntityType(undefined)
-              setFrom(undefined)
-              setTo(undefined)
-              setPickerKey((k) => k + 1)
+              setKeyword('');
+              setEntityType(undefined);
+              setFrom(undefined);
+              setTo(undefined);
+              setPickerKey((k) => k + 1);
               void load({
                 keyword: '',
                 entityType: null,
                 from: null,
                 to: null,
-              })
+              });
             }}
           >
             重置
           </Button>
-          <Button type="primary" loading={loading} onClick={() => void load()}>
+          <Button type='primary' loading={loading} onClick={() => void load()}>
             检索
           </Button>
-          <div style={{ flex: 1 }} />
-          {/* 导出与缩放都通过 chartRef 句柄调用，页面不直接持有 echarts 实例 */}
+          <div style={{ flex: 1, color: '#8c8c8c', fontSize: 12 }}>
+            仅展示你有权限的文档及其实体
+          </div>
           <Button icon={<DownloadOutlined />} onClick={() => chartRef.current?.exportPng()}>
             导出图谱
           </Button>
         </div>
-        <div className="kh-graph-canvas">
-          {/* 有节点才挂图表，空态交给 Spin/Empty，避免 echarts 在空数据上初始化 */}
+        <div className='kh-graph-canvas'>
           {data.nodes.length ? (
             <ForceGraph
               nodes={data.nodes}
@@ -155,16 +154,20 @@ export default function GraphPage() {
               onNodeClick={(node) => setSelected(node)}
             />
           ) : (
-            <div className="kh-graph-empty">
-              {loading ? <Spin /> : <Empty description="暂无图谱数据，发布文档后会写入 Neo4j" />}
+            <div className='kh-graph-empty'>
+              {loading ? (
+                <Spin />
+              ) : (
+                <Empty description='暂无你有权限的图谱数据。发布文档后会写入 Neo4j。' />
+              )}
             </div>
           )}
           {loading && data.nodes.length ? (
-            <div className="kh-graph-loading">
+            <div className='kh-graph-loading'>
               <Spin />
             </div>
           ) : null}
-          <div className="kh-graph-legend">
+          <div className='kh-graph-legend'>
             <span>
               <i style={{ background: '#1677ff' }} /> 文档
             </span>
@@ -181,28 +184,40 @@ export default function GraphPage() {
               <i style={{ background: '#722ed1' }} /> 标签
             </span>
             <span>
-              <span className="kh-legend-line kh-legend-blue" /> 提及
+              <span className='kh-legend-line kh-legend-blue' /> 提及
             </span>
             <span>
-              <span className="kh-legend-dash kh-legend-grey" /> 关联
+              <span className='kh-legend-dash kh-legend-grey' /> 关联
             </span>
             <span>
-              <span className="kh-legend-dash kh-legend-purple" /> 标注
+              <span className='kh-legend-dash kh-legend-purple' /> 标注
             </span>
           </div>
-          <div className="kh-graph-zoom">
-            <Button size="small" icon={<PlusOutlined />} onClick={() => chartRef.current?.zoomIn()} />
-            <Button size="small" icon={<MinusOutlined />} onClick={() => chartRef.current?.zoomOut()} />
-            <Button size="small" icon={<CompressOutlined />} onClick={() => chartRef.current?.reset()} />
-            <Button size="small" icon={<ReloadOutlined />} onClick={() => void load()} />
+          <div className='kh-graph-zoom'>
+            <Button
+              size='small'
+              icon={<PlusOutlined />}
+              onClick={() => chartRef.current?.zoomIn()}
+            />
+            <Button
+              size='small'
+              icon={<MinusOutlined />}
+              onClick={() => chartRef.current?.zoomOut()}
+            />
+            <Button
+              size='small'
+              icon={<CompressOutlined />}
+              onClick={() => chartRef.current?.reset()}
+            />
+            <Button size='small' icon={<ReloadOutlined />} onClick={() => void load()} />
           </div>
-          <div className="kh-graph-hint">可拖拽节点，滚轮缩放；点击文档节点打开正文</div>
+          <div className='kh-graph-hint'>可拖拽节点，滚轮缩放；点击文档节点打开正文</div>
         </div>
       </div>
-      <aside className="kh-graph-side">
-        <div className="kh-graph-card">
+      <aside className='kh-graph-side'>
+        <div className='kh-graph-card'>
           <h4>图谱数据统计</h4>
-          <div className="kh-graph-stats">
+          <div className='kh-graph-stats'>
             <div>
               <b>{data.stats.documentCount}</b>
               <span>文档节点</span>
@@ -229,43 +244,43 @@ export default function GraphPage() {
             </div>
           </div>
         </div>
-        <div className="kh-graph-card">
+        <div className='kh-graph-card'>
           <h4>知识点类型分布</h4>
           {data.stats.entityTypes.length ? (
             <EntityTypePie items={data.stats.entityTypes} />
           ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无" />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='暂无' />
           )}
         </div>
-        <div className="kh-graph-card">
+        <div className='kh-graph-card'>
           <h4>热门知识点 TOP5</h4>
           {data.topEntities.length ? (
-            <ol className="kh-graph-rank">
+            <ol className='kh-graph-rank'>
               {data.topEntities.map((e, i) => (
                 <li key={e.name}>
-                  <span className="kh-rank">{i + 1}</span>
-                  <span className="kh-rank-name">{e.name}</span>
-                  <span className="kh-rank-n">{e.degree}</span>
+                  <span className='kh-rank'>{i + 1}</span>
+                  <span className='kh-rank-name'>{e.name}</span>
+                  <span className='kh-rank-n'>{e.degree}</span>
                 </li>
               ))}
             </ol>
           ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无" />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description='暂无' />
           )}
         </div>
-        <div className="kh-graph-card">
+        <div className='kh-graph-card'>
           <h4>最近更新节点</h4>
           {data.recentNodes.map((n) => (
-            <div key={n.id} className="kh-graph-recent">
+            <div key={n.id} className='kh-graph-recent'>
               <div>{n.name}</div>
               <small>{formatTime(n.updatedAt)}</small>
             </div>
           ))}
         </div>
         {selected ? (
-          <div className="kh-graph-card">
+          <div className='kh-graph-card'>
             <h4>当前节点</h4>
-            <Space direction="vertical" size={4}>
+            <Space direction='vertical' size={4}>
               <div>{selected.name}</div>
               <div style={{ color: '#8c8c8c', fontSize: 12 }}>
                 {selected.kind === 'document'
@@ -276,7 +291,11 @@ export default function GraphPage() {
               </div>
               {selected.description ? <div>{selected.description}</div> : null}
               {selected.documentId ? (
-                <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/documents/${selected.documentId}`)}>
+                <Button
+                  type='link'
+                  style={{ padding: 0 }}
+                  onClick={() => navigate(`/documents/${selected.documentId}`)}
+                >
                   打开文档
                 </Button>
               ) : null}
@@ -285,5 +304,5 @@ export default function GraphPage() {
         ) : null}
       </aside>
     </div>
-  )
+  );
 }
