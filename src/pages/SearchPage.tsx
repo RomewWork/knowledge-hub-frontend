@@ -1,89 +1,98 @@
-/**
- * 检索页：按关键词全文检索文档，支持分类、作者和状态过滤，分页展示命中的标题与片段。
- * 关键交互：POST /search 返回 highlight.{title,summary,content}，页面用 safeHighlight 清洗后再
- * dangerouslySetInnerHTML 渲染；点击标题跳详情页，全文不在列表里返回。
- * 坑 1：状态筛选是拿到当前页结果后在前端 filter，total 会跟着变小，跨页结果并不完整。
- * 坑 2：highlight 里含 <em>，必须经 safeHighlight 转义后渲染，直接把后端字符串塞进 innerHTML 会有 XSS 风险。
- */
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ClockCircleOutlined, FolderOutlined, SearchOutlined } from '@ant-design/icons';
-import { Button, Empty, Input, Pagination, Select, Space, Tag, message } from 'antd';
-import { searchApi } from '../api';
-import { ApiError } from '../api/client';
-import type { SearchHit } from '../types';
-import { DOC_STATUS, formatTime, safeHighlight, visibilityMeta } from '../utils';
-import { FileTypeIcon } from '../components/FileTypeIcon';
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ClockCircleOutlined,
+  FolderOutlined,
+  SearchOutlined,
+} from '@ant-design/icons'
+import { Button, Empty, Input, Pagination, Select, Space, Tag, message } from 'antd'
+import { categoryApi, searchApi } from '../api'
+import { ApiError } from '../api/client'
+import type { SearchHit } from '../types'
+import { DOC_STATUS, flattenCategories, formatTime, safeHighlight, visibilityMeta } from '../utils'
+import { FileTypeIcon } from '../components/FileTypeIcon'
 
 export default function SearchPage() {
-  const navigate = useNavigate();
-  const [keyword, setKeyword] = useState('');
-  const [categoryId, setCategoryId] = useState<string>();
-  const [status, setStatus] = useState<number | undefined>();
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [total, setTotal] = useState(0);
-  const [items, setItems] = useState<SearchHit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [elapsed, setElapsed] = useState<number | null>(null);
+  const navigate = useNavigate()
+  const [keyword, setKeyword] = useState('')
+  const [categoryId, setCategoryId] = useState<string>()
+  const [categories, setCategories] = useState<{ value: string; label: string }[]>([])
+  const [status, setStatus] = useState<number | undefined>()
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [items, setItems] = useState<SearchHit[]>([])
+  const [loading, setLoading] = useState(false)
+  const [elapsed, setElapsed] = useState<number | null>(null)
+
+  useEffect(() => {
+    categoryApi
+      .tree()
+      .then((tree) =>
+        setCategories(flattenCategories(tree).map((item) => ({ value: item.id, label: item.label }))),
+      )
+      .catch(() => undefined)
+  }, [])
 
   async function runSearch(nextPage = 1) {
-    const q = keyword.trim();
+    const q = keyword.trim()
     if (!q) {
-      message.warning('请输入关键词');
-      return;
+      message.warning('请输入关键词')
+      return
     }
-    setLoading(true);
-    const started = performance.now();
+    setLoading(true)
+    const started = performance.now()
     try {
       const res = await searchApi.search({
         keyword: q,
         page: nextPage,
         pageSize,
         categoryId: categoryId || undefined,
-      });
-      const filtered =
-        status === undefined ? res.items : res.items.filter((x) => x.status === status);
-      setItems(filtered);
-      setTotal(status === undefined ? res.total : filtered.length);
-      setPage(nextPage);
-      setElapsed((performance.now() - started) / 1000);
+      })
+      const filtered = status === undefined ? res.items : res.items.filter((x) => x.status === status)
+      setItems(filtered)
+      setTotal(status === undefined ? res.total : filtered.length)
+      setPage(nextPage)
+      setElapsed((performance.now() - started) / 1000)
     } catch (error) {
-      message.error(error instanceof ApiError ? error.message : '搜索失败');
+      message.error(error instanceof ApiError ? error.message : '搜索失败')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   return (
-    <div className='kh-page'>
-      <p className='kh-access-hint'>只会检索你有权限的已发布文档：公开、所在团队，以及自己写的。</p>
-      <div className='kh-search-bar'>
+    <div className="kh-page">
+      <p className="kh-access-hint">
+        只会检索你有权限的已发布文档：公开、所在团队，以及自己写的。
+      </p>
+      <div className="kh-search-bar">
         <Input
-          size='large'
+          size="large"
           allowClear
           prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-          placeholder='输入关键词，检索你有权限的文档'
+          placeholder="输入关键词，检索你有权限的文档"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           onPressEnter={() => void runSearch(1)}
         />
-        <Button type='primary' size='large' loading={loading} onClick={() => void runSearch(1)}>
+        <Button type="primary" size="large" loading={loading} onClick={() => void runSearch(1)}>
           搜索
         </Button>
       </div>
-      <div className='kh-filters'>
-        <Input
+      <div className="kh-filters">
+        <Select
           allowClear
           style={{ width: 180 }}
-          placeholder='分类 ID'
+          placeholder="分类"
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value || undefined)}
+          onChange={setCategoryId}
+          options={categories}
         />
         <Select
           allowClear
           style={{ width: 160 }}
-          placeholder='文档状态'
+          placeholder="文档状态"
           value={status}
           onChange={setStatus}
           options={[
@@ -95,8 +104,8 @@ export default function SearchPage() {
         />
         <Button
           onClick={() => {
-            setCategoryId(undefined);
-            setStatus(undefined);
+            setCategoryId(undefined)
+            setStatus(undefined)
           }}
         >
           清空
@@ -104,7 +113,7 @@ export default function SearchPage() {
       </div>
 
       {elapsed !== null ? (
-        <div className='kh-result-meta'>
+        <div className="kh-result-meta">
           <span>
             找到约 {total} 条可见结果（用时 {elapsed.toFixed(2)} 秒）
           </span>
@@ -112,31 +121,34 @@ export default function SearchPage() {
         </div>
       ) : null}
 
-      {!items.length && elapsed !== null ? <Empty description='没有匹配的可见文档' /> : null}
+      {!items.length && elapsed !== null ? (
+        <Empty description="没有匹配的可见文档" />
+      ) : null}
 
       {items.map((hit) => {
-        const titleHtml = hit.highlight.title[0] || hit.title;
-        const snippet = hit.highlight.content[0] || hit.highlight.summary[0] || hit.summary || '';
-        const statusMeta = hit.status != null ? DOC_STATUS[hit.status] : undefined;
-        const vis = visibilityMeta(hit);
+        const titleHtml = hit.highlight.title[0] || hit.title
+        const snippet =
+          hit.highlight.content[0] || hit.highlight.summary[0] || hit.summary || ''
+        const statusMeta = hit.status != null ? DOC_STATUS[hit.status] : undefined
+        const vis = visibilityMeta(hit)
         return (
-          <div className='kh-hit' key={hit.id}>
-            <div className='kh-hit-icon'>
+          <div className="kh-hit" key={hit.id}>
+            <div className="kh-hit-icon">
               <FileTypeIcon name={hit.title} size={28} />
             </div>
             <div style={{ flex: 1 }}>
               <div
-                className='kh-hit-title'
+                className="kh-hit-title"
                 onClick={() => navigate(`/documents/${hit.id}`)}
                 dangerouslySetInnerHTML={{ __html: safeHighlight(titleHtml) }}
               />
               {snippet ? (
                 <div
-                  className='kh-hit-snippet'
+                  className="kh-hit-snippet"
                   dangerouslySetInnerHTML={{ __html: safeHighlight(snippet) }}
                 />
               ) : null}
-              <div className='kh-hit-meta'>
+              <div className="kh-hit-meta">
                 <span>
                   <FolderOutlined /> 来自文档库
                 </span>
@@ -157,7 +169,7 @@ export default function SearchPage() {
               </div>
             </div>
           </div>
-        );
+        )
       })}
 
       {total > pageSize ? (
@@ -171,5 +183,5 @@ export default function SearchPage() {
         </div>
       ) : null}
     </div>
-  );
+  )
 }

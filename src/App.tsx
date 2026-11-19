@@ -1,11 +1,3 @@
-/**
- * 职责：路由表与访问控制：Guard 拦游客，Perm 按权限码拦越权，admin 域再按角色收敛。
- * 依赖：./auth 的 useAuth、./utils 的 can/isAdmin/isReviewer、pages 下各页面。
- * 坑：
- * 1. 所有业务路由都嵌在 AppLayout 之下，靠它的 Outlet 渲染，父路由 element 不能漏；
- * 2. 前端守卫只是体验优化，不是安全边界，接口仍必须由后端鉴权；
- * 3. 未匹配路径按登录态分流到 /dashboard 或 /login，避免刷新后白屏。
- */
 import { Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from './auth'
@@ -23,16 +15,20 @@ import UsersPage from './pages/admin/UsersPage'
 import RolesPage from './pages/admin/RolesPage'
 import TeamsPage from './pages/admin/TeamsPage'
 import ReviewsPage from './pages/admin/ReviewsPage'
+import CategoriesPage from './pages/admin/CategoriesPage'
+import FavoritesPage from './pages/FavoritesPage'
+import DocumentVersionsPage from './pages/DocumentVersionsPage'
+import SharePage from './pages/SharePage'
+import NotificationsPage from './pages/NotificationsPage'
+import BroadcastPage from './pages/admin/BroadcastPage'
 import { can, isAdmin, isReviewer } from './utils'
 
-// 登录态守卫：未登录统一回登录页，replace 避免用户点返回又弹回来
 function Guard({ children }: { children: ReactNode }) {
   const user = useAuth()
   if (!user) return <Navigate to="/login" replace />
   return children
 }
 
-// 权限守卫：无权限时退回大盘，而不是渲染空白页
 function Perm({ code, children }: { code: string; children: ReactNode }) {
   const user = useAuth()
   if (!can(user, code)) return <Navigate to="/dashboard" replace />
@@ -44,6 +40,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/share/:code" element={<SharePage />} />
       <Route
         path="/"
         element={
@@ -58,7 +55,23 @@ export default function App() {
           path="documents"
           element={
             <Perm code="document:list">
-              <DocumentsPage />
+              <DocumentsPage key="all" />
+            </Perm>
+          }
+        />
+        <Route
+          path="documents/mine"
+          element={
+            <Perm code="document:list">
+              <DocumentsPage key="mine" mine />
+            </Perm>
+          }
+        />
+        <Route
+          path="favorites"
+          element={
+            <Perm code="document:list">
+              <FavoritesPage />
             </Perm>
           }
         />
@@ -67,6 +80,14 @@ export default function App() {
           element={
             <Perm code="document:create">
               <DocumentEditPage />
+            </Perm>
+          }
+        />
+        <Route
+          path="documents/:id/versions"
+          element={
+            <Perm code="document:list">
+              <DocumentVersionsPage />
             </Perm>
           }
         />
@@ -110,6 +131,7 @@ export default function App() {
             </Perm>
           }
         />
+        <Route path="notifications" element={<NotificationsPage />} />
         <Route
           path="profile"
           element={
@@ -129,6 +151,14 @@ export default function App() {
         <Route
           path="admin/teams"
           element={isAdmin(user) ? <TeamsPage /> : <Navigate to="/dashboard" replace />}
+        />
+        <Route
+          path="admin/notifications"
+          element={isAdmin(user) ? <BroadcastPage /> : <Navigate to="/dashboard" replace />}
+        />
+        <Route
+          path="admin/categories"
+          element={isAdmin(user) ? <CategoriesPage /> : <Navigate to="/dashboard" replace />}
         />
         <Route
           path="admin/reviews"

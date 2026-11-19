@@ -1,67 +1,81 @@
-/**
- * 文档列表页：按标题/状态筛选并分页展示文档，提供新建、上传解析和行内发布。
- * 关键交互：查询、翻页、操作后刷新都走 load()，分页参数 page/pageSize 交给后端；
- * 上传解析用 FormData 提交到 /documents/upload/parse，产出是并列的草稿记录，完成后跳编辑页。
- * 坑 1：load() 读的是闭包里的 title/status，改完筛选条件必须显式调用 load(1)，不会自动重新请求。
- * 坑 2：beforeUpload 必须返回 false 拦掉 antd 的默认上传，否则同一个文件会被传两次；
- * 而按钮按状态/权限隐藏只是体验，发布等接口后端仍会校验权限和状态。
- */
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button, Checkbox, Input, Select, Space, Table, Tag, Upload, message } from 'antd';
-import { documentApi } from '../api';
-import { ApiError } from '../api/client';
-import type { DocumentItem } from '../types';
-import { useAuth } from '../auth';
-import { DOC_STATUS, can, canWriteDocument, formatTime, visibilityMeta } from '../utils';
-import { FileTypeIcon, fileTypeLabel } from '../components/FileTypeIcon';
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Button, Checkbox, Input, Select, Space, Table, Tag, Upload, message } from 'antd'
+import { categoryApi, documentApi } from '../api'
+import { ApiError } from '../api/client'
+import type { DocumentItem } from '../types'
+import { useAuth } from '../auth'
+import {
+  DOC_STATUS,
+  can,
+  canWriteDocument,
+  flattenCategories,
+  formatTime,
+  visibilityMeta,
+} from '../utils'
+import { FileTypeIcon, fileTypeLabel } from '../components/FileTypeIcon'
 
-export default function DocumentsPage() {
-  const user = useAuth();
-  const navigate = useNavigate();
-  const [title, setTitle] = useState('');
-  const [status, setStatus] = useState<number | undefined>();
-  const [mineOnly, setMineOnly] = useState(false);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [items, setItems] = useState<DocumentItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const pageSize = 10;
+export default function DocumentsPage({ mine = false }: { mine?: boolean }) {
+  const user = useAuth()
+  const navigate = useNavigate()
+  const [title, setTitle] = useState('')
+  const [status, setStatus] = useState<number | undefined>()
+  const [categoryId, setCategoryId] = useState<string>()
+  const [categories, setCategories] = useState<{ value: string; label: string }[]>([])
+  const [mineOnly, setMineOnly] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [items, setItems] = useState<DocumentItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const pageSize = 10
 
   async function load(nextPage = page) {
-    setLoading(true);
+    setLoading(true)
     try {
       const res = await documentApi.list({
         page: nextPage,
         pageSize,
         title: title.trim() || undefined,
         status,
-        authorId: mineOnly ? user?.userId : undefined,
-      });
-      setItems(res.items);
-      setTotal(res.total);
-      setPage(nextPage);
+        categoryId,
+        mine: mine ? 1 : undefined,
+        authorId: !mine && mineOnly ? user?.userId : undefined,
+      })
+      setItems(res.items)
+      setTotal(res.total)
+      setPage(nextPage)
     } catch (error) {
-      message.error(error instanceof ApiError ? error.message : '加载失败');
+      message.error(error instanceof ApiError ? error.message : '加载失败')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    void load(1);
-  }, []);
+    categoryApi
+      .tree()
+      .then((tree) =>
+        setCategories(flattenCategories(tree).map((item) => ({ value: item.id, label: item.label }))),
+      )
+      .catch(() => undefined)
+    void load(1)
+    // 可见文档 / 我的文档是同一个组件，mine 变化时要重新查询
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mine])
 
   return (
-    <div className='kh-page'>
-      <p className='kh-access-hint'>
-        列表只展示你能看的文档：公开、所在团队，以及自己写的。编辑 / 发布仅作者或管理员可用。
+    <div className="kh-page">
+      <h2 style={{ marginTop: 0 }}>{mine ? '我的文档' : '可见文档'}</h2>
+      <p className="kh-access-hint">
+        {mine
+          ? '这里是你创建的文档，包括草稿、待审核和已发布。'
+          : '列表只展示你能看的文档：公开、所在团队，以及自己写的。编辑 / 发布仅作者或管理员可用。'}
       </p>
       <Space style={{ marginBottom: 16 }} wrap>
         <Input
           allowClear
-          placeholder='标题搜索'
+          placeholder="标题搜索"
           style={{ width: 240 }}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -69,7 +83,15 @@ export default function DocumentsPage() {
         />
         <Select
           allowClear
-          placeholder='状态'
+          placeholder="分类"
+          style={{ width: 180 }}
+          value={categoryId}
+          onChange={setCategoryId}
+          options={categories}
+        />
+        <Select
+          allowClear
+          placeholder="状态"
           style={{ width: 140 }}
           value={status}
           onChange={setStatus}
@@ -78,35 +100,41 @@ export default function DocumentsPage() {
             label: v.label,
           }))}
         />
-        <Checkbox checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)}>
-          仅我的
-        </Checkbox>
+        {mine ? null : (
+          <Checkbox
+            checked={mineOnly}
+            onChange={(e) => setMineOnly(e.target.checked)}
+          >
+            仅我的
+          </Checkbox>
+        )}
         <Button onClick={() => void load(1)}>查询</Button>
         {can(user, 'document:create') ? (
           <>
-            <Button type='primary' onClick={() => navigate('/documents/new')}>
+            <Button type="primary" onClick={() => navigate('/documents/new')}>
               新建文档
             </Button>
             <Upload
               showUploadList={false}
+              disabled={uploading}
               beforeUpload={async (file) => {
-                if (uploading) return false;
-                const form = new FormData();
-                form.append('file', file);
-                setUploading(true);
-                const pending = message.loading('正在解析，请留在此页', 0);
+                if (uploading) return false
+                const form = new FormData()
+                form.append('file', file)
+                setUploading(true)
+                const pending = message.loading('正在解析，请留在此页', 0)
                 try {
-                  const res = await documentApi.uploadParse(form);
-                  pending();
-                  message.success('已解析为草稿');
-                  navigate(`/documents/${res.documentId}`);
+                  const res = await documentApi.uploadParse(form)
+                  pending()
+                  message.success('已解析为草稿')
+                  navigate(`/documents/${res.documentId}`)
                 } catch (error) {
-                  pending();
-                  message.error(error instanceof ApiError ? error.message : '上传失败');
+                  pending()
+                  message.error(error instanceof ApiError ? error.message : '上传失败')
                 } finally {
-                  setUploading(false);
+                  setUploading(false)
                 }
-                return false;
+                return false
               }}
             >
               <Button loading={uploading}>{uploading ? '解析中' : '上传解析'}</Button>
@@ -115,7 +143,7 @@ export default function DocumentsPage() {
         ) : null}
       </Space>
       <Table
-        rowKey='id'
+        rowKey="id"
         loading={loading}
         dataSource={items}
         pagination={{ current: page, pageSize, total, onChange: (p) => void load(p) }}
@@ -140,6 +168,12 @@ export default function DocumentsPage() {
             render: (title: string) => fileTypeLabel(title),
           },
           {
+            title: '分类',
+            dataIndex: 'categoryName',
+            width: 140,
+            render: (value?: string | null) => value || '-',
+          },
+          {
             title: '状态',
             dataIndex: 'status',
             width: 100,
@@ -149,8 +183,8 @@ export default function DocumentsPage() {
             title: '可见性',
             width: 110,
             render: (_: unknown, row: DocumentItem) => {
-              const vis = visibilityMeta(row);
-              return <Tag color={vis.color}>{vis.label}</Tag>;
+              const vis = visibilityMeta(row)
+              return <Tag color={vis.color}>{vis.label}</Tag>
             },
           },
           { title: '更新时间', dataIndex: 'updatedAt', width: 180, render: formatTime },
@@ -158,7 +192,7 @@ export default function DocumentsPage() {
             title: '操作',
             width: 160,
             render: (_: unknown, row: DocumentItem) => {
-              const writable = can(user, 'document:edit') && canWriteDocument(user, row);
+              const writable = can(user, 'document:edit') && canWriteDocument(user, row)
               return (
                 <Space>
                   {writable ? (
@@ -168,11 +202,11 @@ export default function DocumentsPage() {
                     <a
                       onClick={async () => {
                         try {
-                          await documentApi.publish(row.id);
-                          message.success('已提交发布');
-                          void load();
+                          await documentApi.publish(row.id)
+                          message.success('已提交发布')
+                          void load()
                         } catch (error) {
-                          message.error(error instanceof ApiError ? error.message : '发布失败');
+                          message.error(error instanceof ApiError ? error.message : '发布失败')
                         }
                       }}
                     >
@@ -180,11 +214,11 @@ export default function DocumentsPage() {
                     </a>
                   ) : null}
                 </Space>
-              );
+              )
             },
           },
         ]}
       />
     </div>
-  );
+  )
 }
